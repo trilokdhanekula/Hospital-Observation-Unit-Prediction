@@ -1,0 +1,383 @@
+---
+title: "Data Driven - Project"
+author: "Nikita, Trilok, Deekshita"
+date: "2024-10-10"
+output: html_document
+---
+Reading the Dataset
+```{r}
+# Read the CSV file
+HOU <- read.csv("C:/Users/dsrin/OneDrive/Desktop/MSBA/Data Driven/Data Driven Project/OUData.csv")
+# View the first few rows of the dataset
+head(HOU)
+```
+Understanding the Dataset
+```{r}
+# Structure of the data
+str(HOU)
+
+# Summary Statistics of the data
+summary(HOU)
+
+# Dimensions of the data
+dim(HOU)
+```
+Changing the Data types to numeric
+```{r}
+#Setting the all the numeric variables as numeric
+HOU$BloodPressureUpper <- as.numeric(as.character(HOU$BloodPressureUpper))
+
+HOU$BloodPressureLower <- as.numeric(as.character(HOU$BloodPressureLower))
+
+HOU$BloodPressureDiff <- as.numeric(as.character(HOU$BloodPressureDiff))
+
+HOU$Pulse <- as.numeric(as.character(HOU$Pulse))
+
+HOU$PulseOximetry <- as.numeric(as.character(HOU$PulseOximetry))
+
+HOU$Respirations <- as.numeric(as.character(HOU$Respirations))
+
+HOU$OU_LOS_hrs <- as.numeric(as.character(HOU$OU_LOS_hrs))
+
+HOU$Temperature <- as.numeric(as.character(HOU$Temperature))
+```
+```{r}
+#Factoring so as to represent the related groups
+HOU$DRG01 <- factor(HOU$DRG01, 
+                      levels=c(276, 428, 486, 558, 577, 578, 599, 780, 782, 786, 787, 789),
+                      labels = c("Dehydration", "Congestive Heart Failure", "Pneumonia", "Colitis", "Pancreatitis", "GI Bleeding", "Urinary Tract Infection", "Syncope", "Edema", "Chest pain", "Nausea", "Abdominal pain"))
+```
+Exploratory Data Analysis
+```{r}
+#Checking for missing values and displaying
+Missing = sum(is.na(HOU))
+Missing
+```
+```{r}
+# Mean Imputation for Numeric Columns
+HOU_imputed <- HOU  # Make a copy of the data
+
+numeric_vars <- sapply(HOU_imputed, is.numeric)  # Identify numeric columns
+HOU_imputed[numeric_vars] <- lapply(HOU_imputed[numeric_vars], function(x) {
+  ifelse(is.na(x), mean(x, na.rm = TRUE), x)
+})
+
+```
+
+```{r}
+#Checking for missing values and displaying
+Missing = sum(is.na(HOU_imputed))
+Missing
+```
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(reshape2)  # For reshaping the correlation matrix for ggplot
+
+# Select only numeric columns from the original dataset
+numeric_data_with_outliers <- HOU %>%
+  select_if(is.numeric)
+
+# Calculate the correlation matrix
+correlation_matrix_with_outliers <- cor(numeric_data_with_outliers, use = "complete.obs")
+
+# Melt the correlation matrix into long format for ggplot
+correlation_data_with_outliers <- melt(correlation_matrix_with_outliers)
+
+# Create the heatmap
+ggplot(data = correlation_data_with_outliers, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white",
+                       midpoint = 0, limit = c(-1, 1), space = "Lab",
+                       name = "Correlation") +
+  theme_minimal() + 
+  labs(title = "Correlation Heatmap of Numeric Variables (With Outliers)") +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+```
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# List of numeric variables to plot
+numeric_vars <- c("Pulse", "BloodPressureUpper", "BloodPressureLower", "Temperature", "Respirations", 
+                  "Age", "OU_LOS_hrs", "PulseOximetry", "BloodPressureDiff")
+
+# Loop through each variable and create a box plot
+for (var in numeric_vars) {
+  print(
+    ggplot(HOU, aes_string(y = var)) +
+      geom_boxplot(fill = "skyblue", color = "black") +
+      labs(title = paste("Boxplot of", var), y = var) +
+      theme_minimal()
+  )
+}
+
+```
+```{r}
+# Function to remove outliers based on IQR for a given column
+remove_outliers <- function(data, column) {
+  Q1 <- quantile(data[[column]], 0.25, na.rm = TRUE)
+  Q3 <- quantile(data[[column]], 0.75, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  data %>% filter(data[[column]] >= lower_bound & data[[column]] <= upper_bound)
+}
+
+# List of numeric variables for outlier removal
+numeric_vars <- c("Pulse", "BloodPressureUpper", "BloodPressureLower", "Temperature", "Respirations", 
+                  "Age", "OU_LOS_hrs", "PulseOximetry", "BloodPressureDiff", "Flipped")
+
+# Apply outlier removal for each variable in the dataset
+HOU_no_outliers <- HOU  # Start with the original dataset
+
+for (var in numeric_vars) {
+  HOU_no_outliers <- remove_outliers(HOU_no_outliers, var)
+}
+
+# Check the dimensions of the dataset after removing outliers
+dim(HOU_no_outliers)
+
+```
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# List of numeric variables to plot
+numeric_vars <- c("Pulse", "BloodPressureUpper", "BloodPressureLower", "Temperature", "Respirations", 
+                  "Age", "OU_LOS_hrs", "PulseOximetry", "BloodPressureDiff")
+
+# Loop through each variable and create a box plot
+for (var in numeric_vars) {
+  print(
+    ggplot(HOU_no_outliers, aes_string(y = var)) +
+      geom_boxplot(fill = "lightblue", color = "black") +
+      labs(title = paste("Boxplot of", var, "(Outliers Removed)"), y = var) +
+      theme_minimal()
+  )
+}
+
+```
+
+```{r}
+ggplot(HOU_no_outliers, aes(x = Pulse)) +
+  geom_histogram(binwidth = 5, fill = "skyblue", color = "black") +
+  labs(title = "Histogram of Pulse", x = "Pulse", y = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+ggplot(HOU_no_outliers, aes(x = Age, y = OU_LOS_hrs)) +
+  geom_bin2d() +
+  scale_fill_gradient(low = "skyblue", high = "red") +
+  labs(title = "Heatmap of Age vs Length of Stay", x = "Age", y = "Length of Stay (hrs)") +
+  theme_minimal()
+
+```
+
+
+```{r}
+# Load necessary library
+library(ggplot2)
+
+ggplot(HOU_no_outliers, aes(x = Pulse, y = OU_LOS_hrs)) + 
+  geom_point(alpha = 0.6) + 
+  theme_minimal() + 
+  facet_wrap(~ DRG01) + 
+  labs(title = "Pulse vs Length of Stay by Diagnosis (Faceted)", 
+       x = "Pulse", y = "Length of Stay (hours)")
+
+```
+
+```{r}
+# Load necessary library
+library(dplyr)
+
+# Create age groups
+HOU_no_outliers <- HOU_no_outliers %>%
+  mutate(AgeGroup = case_when(
+    Age < 18 ~ "Child",
+    Age >= 18 & Age < 35 ~ "Young Adult",
+    Age >= 35 & Age < 55 ~ "Adult",
+    Age >= 55 & Age < 75 ~ "Senior",
+    Age >= 75 ~ "Elderly"
+  ))
+
+```
+```{r}
+# Load ggplot2 library
+library(ggplot2)
+
+# Box plot of Length of Stay by Age Group
+ggplot(HOU_no_outliers, aes(x = AgeGroup, y = OU_LOS_hrs)) +
+  geom_boxplot(fill = "skyblue", color = "black") +
+  labs(title = "Length of Stay by Age Group", x = "Age Group", y = "Length of Stay (hrs)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+```{r}
+# Perform one-way ANOVA
+anova_result <- aov(OU_LOS_hrs ~ DRG01, data = HOU_no_outliers)
+
+# Summary of the ANOVA results
+summary(anova_result)
+
+```
+```{r}
+# Tukey's HSD test for pairwise comparisons
+tukey_result <- TukeyHSD(anova_result)
+
+# Summary of Tukey's test results
+print(tukey_result)
+
+```
+
+```{r}
+# Perform one-way ANOVA
+anova_result_age <- aov(OU_LOS_hrs ~ AgeGroup, data = HOU_no_outliers)
+
+# Summary of the ANOVA results
+summary(anova_result_age)
+
+```
+```{r}
+# Tukey's HSD test for pairwise comparisons
+tukey_result_age <- TukeyHSD(anova_result_age)
+
+# Summary of Tukey's test results
+print(tukey_result_age)
+
+```
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Define the training index (random sample of 70% of rows)
+train_index <- sample(seq_len(nrow(HOU_no_outliers)), size = 0.7 * nrow(HOU_no_outliers))
+
+# Split the dataset
+train_data <- HOU_no_outliers[train_index, ]  # 70% for training
+test_data <- HOU_no_outliers[-train_index, ]  # 30% for testing
+
+# Check dimensions to confirm the split
+cat("Training Set:", dim(train_data), "\n")
+cat("Testing Set:", dim(test_data), "\n")
+
+```
+```{r}
+# Run a logistic regression model
+logistic_model <- glm(Flipped ~ Age + Pulse + BloodPressureUpper + PulseOximetry + BloodPressureLower + Temperature + Respirations + OU_LOS_hrs + DRG01,
+                      data = train_data, 
+                      family = binomial)
+
+# Summary of the logistic regression model
+summary(logistic_model)
+
+```
+```{r}
+stepwise_model <- step(logistic_model, direction = "both")
+```
+```{r}
+# Run the updated logistic regression model with significant variables
+updated_logistic_model <- glm(Flipped ~ BloodPressureLower + Temperature + OU_LOS_hrs + DRG01,
+                              data = train_data, 
+                              family = binomial)
+
+# Summary of the updated logistic regression model
+summary(updated_logistic_model)
+
+```
+
+```{r}
+# Load necessary libraries
+library(pROC)
+library(ggplot2)
+
+# Predict probabilities on the test data using the updated logistic model
+test_data$predicted_probs <- predict(updated_logistic_model, newdata = test_data, type = "response")
+
+# Generate the ROC curve
+roc_curve <- roc(test_data$Flipped, test_data$predicted_probs)
+
+# Plot the ROC curve using ggplot2
+ggplot(data = as.data.frame(roc_curve$sensitivities), aes(x = 1 - roc_curve$specificities, y = roc_curve$sensitivities)) +
+  geom_line(color = "blue") +
+  geom_abline(linetype = "dashed", color = "red") + # Diagonal line for random guessing
+  labs(title = "ROC Curve for Logistic Regression Model",
+       x = "False Positive Rate (1 - Specificity)",
+       y = "True Positive Rate (Sensitivity)") +
+  theme_minimal() +
+  annotate("text", x = 0.75, y = 0.25, label = paste("AUC =", round(auc(roc_curve), 2)), color = "black")
+
+```
+```{r}
+# Predict probabilities of Flipped = 1
+predictions <- predict(updated_logistic_model, newdata = test_data, type = "response")
+
+# Convert probabilities to binary outcomes (0 or 1) using a threshold (e.g., 0.5)
+predicted_class <- ifelse(predictions > 0.5, 1, 0)
+```
+
+```{r}
+# Confusion matrix
+table(Predicted = predicted_class, Actual = test_data$Flipped)
+
+# Alternatively, calculate accuracy, sensitivity, and specificity
+library(caret)
+confusionMatrix(as.factor(predicted_class), as.factor(test_data$Flipped))
+```
+```{r}
+train_data$Flipped <- as.factor(train_data$Flipped)
+test_data$Flipped <- as.factor(test_data$Flipped)
+library(randomForest)
+rf_model <- randomForest(Flipped ~ BloodPressureLower + Temperature + OU_LOS_hrs + DRG01, 
+                         data = train_data, 
+                         ntree = 500, 
+                         mtry = 2, 
+                         importance = TRUE)
+print(rf_model)
+
+varImpPlot(rf_model, type = 2)
+
+```
+```{r}
+# Get prediction probabilities for the positive class
+pred_probs <- predict(rf_model, newdata = test_data, type = "prob")[, 2]
+
+# Generate the ROC curve
+library(pROC)
+roc_curve <- roc(test_data$Flipped, pred_probs)
+plot(roc_curve, main = "ROC Curve for Random Forest Model")
+```
+
+```{r}
+
+library(caret)
+
+# Predict probabilities and convert to classes with threshold of 0.5
+pred_probs <- predict(rf_model, newdata = test_data, type = "prob")[, 2]
+pred_classes <- ifelse(pred_probs > 0.5, "1", "0")
+pred_classes <- as.factor(pred_classes)
+
+# Ensure that the levels of prediction and actual data are consistent
+levels(pred_classes) <- levels(test_data$Flipped)
+
+# Generate and print the confusion matrix
+confusion_matrix <- confusionMatrix(pred_classes, test_data$Flipped, positive = "1")
+print(confusion_matrix)
+
+```
+
+
+
+
+
+
+
+
+
